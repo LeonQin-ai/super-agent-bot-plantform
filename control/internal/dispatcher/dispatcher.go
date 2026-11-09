@@ -18,6 +18,8 @@ type Dispatcher struct {
 	logger       *slog.Logger
 	scheduler    *execution.Scheduler
 	capabilities execution.CapabilitySource
+	messages     MessageRunner
+	reply        MessageReply
 }
 
 func New(st store.Store, logger *slog.Logger) *Dispatcher {
@@ -107,6 +109,9 @@ func (d *Dispatcher) dispatch(parent context.Context, task model.Task) {
 		return
 	}
 	if q.Kind != execution.TrustedExecutionKind {
+		if q.Kind == "" && d.messages != nil && d.dispatchMessage(parent, task) {
+			return
+		}
 		d.fail(task, "runtime_driver_unavailable", "No restricted Cognitive OS message driver is configured")
 		return
 	}

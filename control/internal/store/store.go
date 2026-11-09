@@ -26,7 +26,7 @@ type Store interface {
 	ListTaskWorkers(context.Context) (map[string]string, error)
 	ClearTaskWorker(context.Context, string) error
 	SetAgentState(context.Context, string, model.AgentState) error
-	IngestFeishuEvent(context.Context, string, string, string, string) (model.Task, bool, error)
+	IngestFeishuEvent(context.Context, string, string, string, string, ...string) (model.Task, bool, error)
 	GetRuntime(context.Context, string) (model.Runtime, error)
 	BeginWake(context.Context, string) (model.Runtime, bool, error)
 	MarkRuntimeReady(context.Context, model.Runtime) error

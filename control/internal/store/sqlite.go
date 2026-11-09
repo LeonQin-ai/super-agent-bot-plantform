@@ -247,7 +247,7 @@ func (s *SQLite) SetAgentState(ctx context.Context, agentID string, state model.
 	return nil
 }
 
-func (s *SQLite) IngestFeishuEvent(ctx context.Context, eventID, openID, chatID, message string) (model.Task, bool, error) {
+func (s *SQLite) IngestFeishuEvent(ctx context.Context, eventID, openID, chatID, message string, messageID ...string) (model.Task, bool, error) {
 	if eventID == "" || openID == "" || message == "" { return model.Task{}, false, errors.New("event_id, open_id and message are required") }
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil { return model.Task{}, false, err }
@@ -272,7 +272,11 @@ VALUES(?,'feishu:p2p','supervisor','IDLE',?,?,?,0,?,?,?,?)`,
 		}
 	}
 	if err != nil { return model.Task{}, false, fmt.Errorf("resolve Feishu Agent: %w", err) }
-	payload, err := json.Marshal(map[string]string{"source":"feishu","open_id":openID,"chat_id":chatID,"content":message})
+	fields := map[string]string{"source":"feishu","open_id":openID,"chat_id":chatID,"content":message}
+	if len(messageID) != 0 && messageID[0] != "" {
+		fields["message_id"] = messageID[0]
+	}
+	payload, err := json.Marshal(fields)
 	if err != nil { return model.Task{}, false, err }
 	taskID := newID("tsk")
 	_, err = tx.ExecContext(ctx, `INSERT INTO tasks(id,agent_id,request_id,state,payload,created_at,updated_at)
