@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/LeonQin-ai/light-agent/control/internal/model"
-	"github.com/LeonQin-ai/light-agent/control/internal/store"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/model"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/store"
 )
 
 var ErrDriverUnavailable = errors.New("runtime driver is not configured")

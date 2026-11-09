@@ -1,4 +1,4 @@
-module github.com/LeonQin-ai/light-agent
+module github.com/LeonQin-ai/super-agent-bot-plantform
 
 go 1.23.0
 

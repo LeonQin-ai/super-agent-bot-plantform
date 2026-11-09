@@ -2,7 +2,7 @@
 
 ## Goal
 
-Light Agent must remain usable on a standalone physical host or VM even when no remote KVM-capable Worker Pool exists. This does not mean every task can run locally. The platform exposes only the isolation boundaries it can actually provide and refuses tasks whose mandatory boundary is unavailable.
+Super Agent Bot Plantform must remain usable on a standalone physical host or VM even when no remote KVM-capable Worker Pool exists. This does not mean every task can run locally. The platform exposes only the isolation boundaries it can actually provide and refuses tasks whose mandatory boundary is unavailable.
 
 This is a local execution policy, not a claim that Docker or gVisor is equivalent to a hardware MicroVM.
 

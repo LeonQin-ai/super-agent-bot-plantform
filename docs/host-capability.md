@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Light Agent must distinguish where it is deployed and what the Linux node can actually execute. Do not infer execution support from labels such as "physical server" or "VM" alone. Platform type and runtime capabilities are separate facts.
+Super Agent Bot Plantform must distinguish where it is deployed and what the Linux node can actually execute. Do not infer execution support from labels such as "physical server" or "VM" alone. Platform type and runtime capabilities are separate facts.
 
 A physical server may have KVM disabled in firmware, missing kernel modules or no accessible `/dev/kvm`. A VM may expose nested virtualization and a usable KVM device. Therefore, the scheduler must use verified capability probes, not a single platform heuristic.
 
@@ -12,7 +12,7 @@ A physical server may have KVM disabled in firmware, missing kernel modules or n
 
 - `bare_metal`: platform detection indicates physical hardware.
 - `virtual_machine`: DMI/hypervisor/systemd detection indicates a guest VM.
-- `container`: Light Agent itself runs inside a container.
+- `container`: Super Agent Bot Plantform itself runs inside a container.
 - `unknown`: evidence is absent or conflicting.
 
 ### Execution capabilities

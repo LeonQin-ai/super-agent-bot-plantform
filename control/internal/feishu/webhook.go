@@ -1,5 +1,5 @@
 package feishu
-import("bytes";"crypto/aes";"crypto/cipher";"crypto/sha256";"crypto/subtle";"encoding/base64";"encoding/hex";"encoding/json";"errors";"io";"net/http";"strings";"github.com/LeonQin-ai/light-agent/control/internal/store")
+import("bytes";"crypto/aes";"crypto/cipher";"crypto/sha256";"crypto/subtle";"encoding/base64";"encoding/hex";"encoding/json";"errors";"io";"net/http";"strings";"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/store")
 type Config struct{Token,EncryptKey string;Allowed map[string]struct{}}
 type Hook struct{s store.Store;c Config}
 func New(s store.Store,c Config)http.Handler{return &Hook{s:s,c:c}}

@@ -1,6 +1,6 @@
 syntax = "proto3";
 package lightagent.v1;
-option go_package = "github.com/LeonQin-ai/light-agent/gen/lightagent/v1;lightagentv1";
+option go_package = "github.com/LeonQin-ai/super-agent-bot-plantform/gen/lightagent/v1;lightagentv1";
 // VM lifecycle only. Never add Host command execution here.
 service SandboxManager {
   rpc CreateVM(CreateVMRequest) returns (VM);

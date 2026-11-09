@@ -1,4 +1,4 @@
-# Light Agent
+# super-agent-bot-plantform
 
 **English** | [简体中文](README.zh-CN.md)
 
@@ -62,8 +62,8 @@ Requires Go 1.23+. Real Worker execution also needs a Linux Host Sandbox Manager
 Docker/runc and cgroup v2. Rust builds were verified with Rust 1.99.1.
 
 ```bash
-git clone https://github.com/LeonQin-ai/light-agent.git
-cd light-agent
+git clone https://github.com/LeonQin-ai/super-agent-bot-plantform.git
+cd super-agent-bot-plantform
 go mod download
 go run ./control/cmd/light-agentd
 ```

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LeonQin-ai/light-agent/control/internal/execution"
-	"github.com/LeonQin-ai/light-agent/control/internal/model"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/execution"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/model"
 )
 
 func TestCapabilityJournalSurvivesRestartWithoutRestoringAuthorization(t *testing.T) {

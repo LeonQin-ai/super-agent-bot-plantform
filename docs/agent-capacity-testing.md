@@ -6,7 +6,7 @@ instance. Only the LLM is mocked using the runtime's built-in deterministic
 provider. This is not a count of idle `sleep` containers or database identities.
 
 This benchmark talks directly to the pinned Cognitive OS HTTP API. It does not
-claim that Light Agent's still-pending production reasoning driver or Feishu
+claim that Super Agent Bot Plantform's still-pending production reasoning driver or Feishu
 orchestration integration is complete.
 
 ## Reproduce on a Linux Docker host

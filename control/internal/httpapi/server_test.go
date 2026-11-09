@@ -8,8 +8,8 @@ import(
 	"path/filepath"
 	"testing"
 
-	"github.com/LeonQin-ai/light-agent/control/internal/execution"
-	"github.com/LeonQin-ai/light-agent/control/internal/store"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/execution"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/store"
 )
 
 func newTestHandler(t *testing.T,token string)http.Handler{

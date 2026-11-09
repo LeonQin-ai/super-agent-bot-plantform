@@ -105,6 +105,6 @@ it. The 120-second check does not prove hour/day-scale memory stability. Real LL
 quotas, long contexts, streaming, builds, browsers and additional services change
 the resource budget. Firecracker MicroVM density was not measured.
 
-This benchmark accesses the real Cognitive OS containers directly. Light Agent's
+This benchmark accesses the real Cognitive OS containers directly. Super Agent Bot Plantform's
 production Cognitive OS lifecycle/message driver and Feishu-to-reasoning path
 remain separate unfinished integrations; this report does not claim otherwise.

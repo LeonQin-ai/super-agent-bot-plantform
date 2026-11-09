@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/LeonQin-ai/light-agent/control/internal/model"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/model"
 	_ "modernc.org/sqlite"
 )
 

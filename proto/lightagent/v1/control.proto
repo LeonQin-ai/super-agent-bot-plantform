@@ -1,6 +1,6 @@
 syntax = "proto3";
 package lightagent.v1;
-option go_package = "github.com/LeonQin-ai/light-agent/gen/lightagent/v1;lightagentv1";
+option go_package = "github.com/LeonQin-ai/super-agent-bot-plantform/gen/lightagent/v1;lightagentv1";
 enum AgentState { AGENT_STATE_UNSPECIFIED=0; AGENT_STATE_CREATED=1; AGENT_STATE_IDLE=2; AGENT_STATE_WAKING=3; AGENT_STATE_ACTIVE=4; AGENT_STATE_SLEEP_PENDING=5; AGENT_STATE_SLEEPING=6; AGENT_STATE_STOPPING=7; AGENT_STATE_STOPPED=8; AGENT_STATE_FAILED=9; AGENT_STATE_DESTROYED=10; }
 enum TaskState { TASK_STATE_UNSPECIFIED=0; TASK_STATE_QUEUED=1; TASK_STATE_RUNNING=2; TASK_STATE_COMPLETED=3; TASK_STATE_CANCELLED=4; TASK_STATE_FAILED=5; }
 message Agent { string agent_id=1; string tenant_id=2; string role=3; AgentState state=4; string memory_id=5; string session_id=6; string workspace_id=7; uint64 generation=8; }

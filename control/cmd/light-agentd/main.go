@@ -12,12 +12,12 @@ import(
 	"syscall"
 	"time"
 
-	"github.com/LeonQin-ai/light-agent/control/internal/config"
-	"github.com/LeonQin-ai/light-agent/control/internal/dispatcher"
-	"github.com/LeonQin-ai/light-agent/control/internal/execution"
-	"github.com/LeonQin-ai/light-agent/control/internal/feishu"
-	"github.com/LeonQin-ai/light-agent/control/internal/httpapi"
-	"github.com/LeonQin-ai/light-agent/control/internal/store"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/config"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/dispatcher"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/execution"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/feishu"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/httpapi"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/store"
 )
 
 func main(){

@@ -6,7 +6,7 @@ Do not classify all virtual machines as lacking MicroVM support. A physical host
 
 ## Decision for hosts without nested virtualization
 
-A 4-vCPU/8-GiB VM without usable `/dev/kvm` cannot run Firecracker. Do not try to emulate KVM or silently downgrade a requested MicroVM. Light Agent must support OCI/Docker execution as a first-class backend and retain Firecracker as an optional backend for hosts that have KVM.
+A 4-vCPU/8-GiB VM without usable `/dev/kvm` cannot run Firecracker. Do not try to emulate KVM or silently downgrade a requested MicroVM. Super Agent Bot Plantform must support OCI/Docker execution as a first-class backend and retain Firecracker as an optional backend for hosts that have KVM.
 
 The word "Sandbox" is a security profile, not a synonym for Docker. A plain Docker container uses namespaces/cgroups and shares the host kernel. It is useful for packaging and ordinary isolation, but should not be described as a VM-strength boundary.
 
@@ -23,7 +23,7 @@ Backend selection is a security-policy decision, not a performance-only preferen
 
 gVisor is still not a hardware VM: it shares the host kernel for the Sentry's host-facing operations and has compatibility/performance trade-offs. For high-risk multi-tenant workloads, use Firecracker on a KVM-capable host or a separate worker host.
 
-## Light Agent component placement
+## Super Agent Bot Plantform component placement
 
 - Go Control Plane: Docker service; owns Agent identity, durable task queue, Feishu/API ingress, quotas and policy.
 - Cognitive OS SuperAgent: long-lived service/container; can plan, manage Agent identities and request approved capabilities. It has no Host shell, Docker socket or arbitrary Host filesystem access.

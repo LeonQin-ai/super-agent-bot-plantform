@@ -1,4 +1,4 @@
-# Light Agent
+# super-agent-bot-plantform
 
 [English](README.md) | **简体中文**
 
@@ -58,8 +58,8 @@ flowchart LR
 和 cgroup v2。Rust 构建已使用 Rust 1.99.1 验证。
 
 ```bash
-git clone https://github.com/LeonQin-ai/light-agent.git
-cd light-agent
+git clone https://github.com/LeonQin-ai/super-agent-bot-plantform.git
+cd super-agent-bot-plantform
 go mod download
 go run ./control/cmd/light-agentd
 ```

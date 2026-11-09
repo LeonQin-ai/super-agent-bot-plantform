@@ -27,6 +27,6 @@ The REST API documents `POST /v1/tasks` with a `prompt`, `GET /v1/tasks/{id}`, a
 
 ## Current status
 
-Light Agent implements the Go-side Runtime record, single-flight wake reservation, generation fencing, sleep admission checks and an injectable `lifecycle.Driver` interface.
+Super Agent Bot Plantform implements the Go-side Runtime record, single-flight wake reservation, generation fencing, sleep admission checks and an injectable `lifecycle.Driver` interface.
 
-There is deliberately no production C11 driver yet. The pinned runtime includes tool and plugin execution paths; launching it as a Host service before capability restriction would violate the Light Agent trust boundary. Runtime wake/sleep HTTP endpoints therefore return `503 runtime_driver_unavailable` until a reviewed driver is wired in.
+There is deliberately no production C11 driver yet. The pinned runtime includes tool and plugin execution paths; launching it as a Host service before capability restriction would violate the Super Agent Bot Plantform trust boundary. Runtime wake/sleep HTTP endpoints therefore return `503 runtime_driver_unavailable` until a reviewed driver is wired in.

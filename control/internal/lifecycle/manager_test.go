@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/LeonQin-ai/light-agent/control/internal/model"
-	"github.com/LeonQin-ai/light-agent/control/internal/store"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/model"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/store"
 )
 
 type fakeDriver struct{ starts,stops int; startErr,stopErr error; startGeneration,stopGeneration uint64; startAgentState,stopAgentState model.AgentState }
