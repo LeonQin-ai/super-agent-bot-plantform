@@ -10,9 +10,10 @@ processes. The current working path runs approved internal commands in hardened
 Docker/runc Workers. Firecracker, gVisor and WASM have separate implementation and
 validation milestones.
 
-**Status:** Linux and Docker execution have been tested on a real VM. The production
-Cognitive OS lifecycle/message driver is still pending; ordinary API/Feishu messages
-currently fail with `runtime_driver_unavailable`.
+**Status:** Live Feishu replies and on-demand Docker execution have been verified
+on a Linux VM. Feishu direct messages use the configured model API. The production
+Cognitive OS lifecycle driver and the ordinary API chat endpoint's message driver
+are still pending.
 
 ## What works today
 
@@ -23,7 +24,7 @@ currently fail with `runtime_driver_unavailable`.
 | Recovery | Persist Worker handles before start; clean recorded Workers on restart; fail interrupted work without replay |
 | Host capabilities | Authenticated probes; 30s refresh, 90s expiry, SQLite observation versions; failures disable execution |
 | Docker Workers | Immutable preloaded image digest/ID; non-root, read-only rootfs, no network/capabilities, resource limits and private workspace |
-| Feishu | Signed, allowlisted direct-message ingestion with atomic durable ACK; reasoning integration pending |
+| Feishu | WebSocket bridge, allowlisted direct messages, durable deduplication, on-demand Agent creation and model replies |
 | Agent lifecycle | Generation fencing and wake/sleep state machine; production driver not wired |
 | Firecracker / file broker | Jailer, vsock, Guest RPC and conflict-checked workspace foundations; KVM boot validation pending |
 | gVisor / WASM | Policy and capability scaffolding; execution providers pending |
@@ -41,8 +42,10 @@ flowchart LR
     Policy --> Host[Rust Sandbox Manager]
     Host --> Docker[Docker/runc Worker]
     Docker --> Exec[cos-execd]
-    Messages[API / Feishu messages] --> Go
-    Go -. pending driver .-> Cognitive[Cognitive OS reasoning runtime]
+    Feishu[Feishu direct messages] -->|WebSocket| Bridge[Python Feishu bridge]
+    Bridge -->|Signed loopback request| Go
+    Go <-->|Chat completions| Model[Model API]
+    Go -->|Reply| Feishu
 ```
 
 - **Go control plane** owns admission, durable state, cancellation and recovery.
@@ -110,6 +113,45 @@ Examples and recovery semantics are in [durable execution](docs/durable-executio
 Ordinary chat text is not converted into commands or image configuration. Docker
 execution accepts trusted-internal work; unsupported or noncompliant work fails closed.
 
+### Connect a Feishu bot and model on Linux
+
+The verified deployment runs the Go control plane, Rust Sandbox Manager and
+Python Feishu bridge as host services under systemd. The control plane calls the
+model over HTTPS. It creates a persistent Agent on the first authorized message
+from each Feishu Open ID and reuses it on subsequent messages. Each message
+creates an independent task. When the model requests the SHA-256 tool, the
+manager starts a network-disabled Docker Worker and removes it after execution.
+SHA-256 is the only sandbox tool currently exposed to the model.
+
+1. Enable the bot capability in a Feishu custom app, grant
+   `im:message.p2p_msg:readonly` and `im:message:send_as_bot`, and select
+   WebSocket event delivery. Subscribe to `im.message.receive_v1` and publish
+   the app version. Feishu can require an active bridge before saving the
+   delivery mode. [Feishu WebSocket setup](https://open.feishu.cn/document/ukTMukTMukTM/uYDNxYjL2QTM24iN0EjN/event-subscription-configure-) · [Message permissions](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/guide/faq)
+2. Configure the following environment variables and start the control plane
+   with the Docker settings above if you want sandbox tools. The pinned Worker
+   image needs `/bin/sh` and `/usr/bin/sha256sum` for this tool.
+3. In a Python virtual environment, install `lark-oapi` with
+   `python -m pip install lark-oapi`. Start
+   `python scripts/feishu-bridge.py` with the shared variables below. For
+   persistent operation, run the processes as systemd services and load each
+   service's environment from a restricted file.
+
+| Scope | Variables |
+|---|---|
+| Both services | `LIGHT_AGENT_LISTEN_ADDR=127.0.0.1:8080`, `FEISHU_APP_ID`, `FEISHU_APP_SECRET` |
+| Both services | `FEISHU_VERIFICATION_TOKEN` and `FEISHU_ENCRYPT_KEY`, two shared random secrets for signing and authenticating the local relay |
+| Both services | `FEISHU_ALLOWED_OPEN_IDS` (comma-separated Open IDs without spaces), `FEISHU_ALLOWED_OPEN_ID_FILE` (absolute path for an optional single authorized Open ID; the bridge requires the path even when using only the list) |
+| Control plane | `LIGHT_AGENT_MODEL_BASE_URL`, `LIGHT_AGENT_MODEL`, `LIGHT_AGENT_MODEL_API_KEY` |
+
+Set the model Base URL without the `/chat/completions` suffix. The Linux test
+used `https://ark.cn-beijing.volces.com/api/plan/v3` and
+`deepseek-v4.1-flash-economy`. Keep the model API key in the control plane's
+environment file. Once the bridge reports `Feishu WebSocket connected`, send
+“Use the sandbox to compute the SHA-256 of hello” from an allowed account. Check
+that the bot replies and the control plane logs
+`Feishu sandbox checksum completed` and `Feishu task reply delivered`.
+
 ### Deploy the control plane with Compose
 
 ```bash
@@ -118,12 +160,18 @@ cp deploy/.env.example deploy/.env
 docker compose --env-file deploy/.env -f deploy/compose.yaml up --build -d
 ```
 
-Compose deploys **only the Go control plane**. It does not start the Sandbox Manager,
-reasoning service or a model. It publishes the API on Host loopback without mounting
+Compose deploys **only the Go control plane**. Start the Sandbox Manager and
+Feishu bridge separately for the live Feishu path. Compose publishes the API on
+Host loopback without mounting
 the Docker socket. A containerized control plane needs a reachable, protected HTTPS
 Manager endpoint; its loopback is not the Docker Host's loopback.
 
 ## Validation and capacity
+
+On 2026-11-10, a real Feishu direct message reached the Linux service, the
+configured Ark model requested a Docker Worker to compute the SHA-256 of
+`hello`, and Feishu delivered the reply. The Worker was cleaned up. A separate
+signed-event smoke test verified deduplication and Agent reuse with the live model.
 
 On an OpenCloudOS VM with **4 vCPUs and 3655MiB RAM**, native Go race/static checks,
 12 Rust tests, release builds and seven real Docker smoke groups passed. The complete
