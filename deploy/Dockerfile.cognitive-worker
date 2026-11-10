@@ -1,0 +1,5 @@
+ARG COGNITIVE_BASE_IMAGE=light-agent/cognitive-capacity-recipe:6bdfc849
+FROM ${COGNITIVE_BASE_IMAGE}
+COPY --chmod=0755 sabp-cognitive-worker /usr/local/bin/sabp-cognitive-worker
+ENTRYPOINT ["/usr/local/bin/sabp-cognitive-worker"]
+CMD []

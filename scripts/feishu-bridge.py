@@ -33,9 +33,14 @@ def message_text(message):
 def main():
     token = os.environ["FEISHU_VERIFICATION_TOKEN"]
     key = os.environ["FEISHU_ENCRYPT_KEY"]
-    allowed = set(os.environ.get("FEISHU_ALLOWED_OPEN_IDS", "").split(","))
-    owner = Path(os.environ["FEISHU_ALLOWED_OPEN_ID_FILE"])
-    enrollment = owner.with_name("enrollment")
+    allowed = {item.strip() for item in os.environ.get("FEISHU_ALLOWED_OPEN_IDS", "").split(",") if item.strip()}
+    owner_path = os.environ.get("FEISHU_ALLOWED_OPEN_ID_FILE")
+    owner = Path(owner_path) if owner_path else None
+    enrollment = owner.with_name("enrollment") if owner else None
+    route = os.environ.get("FEISHU_APP_ROUTE", "")
+    if route and not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", route):
+        raise ValueError("invalid Feishu application route")
+    endpoint = "/webhooks/feishu" + ("/" + route if route else "")
     listen = os.environ["LIGHT_AGENT_LISTEN_ADDR"]
     if not listen.startswith("127.0.0.1:"):
         raise ValueError("Feishu bridge requires an IPv4 loopback control plane")
@@ -44,6 +49,8 @@ def main():
     def authorize(open_id, text):
         if open_id in allowed:
             return True
+        if owner is None:
+            return False
         if owner.exists():
             return owner.read_text().strip() == open_id
         if not enrollment.exists() or time.time() - enrollment.stat().st_mtime > 86400:
@@ -82,7 +89,7 @@ def main():
         }, ensure_ascii=False).encode()
         stamp, nonce = str(int(time.time())), secrets.token_hex(16)
         signature = hashlib.sha256((stamp + nonce + key).encode() + body).hexdigest()
-        request = urllib.request.Request("http://" + listen + "/webhooks/feishu", body, {
+        request = urllib.request.Request("http://" + listen + endpoint, body, {
             "Content-Type": "application/json",
             "X-Lark-Request-Timestamp": stamp,
             "X-Lark-Request-Nonce": nonce,

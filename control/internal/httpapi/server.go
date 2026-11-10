@@ -44,7 +44,10 @@ func NewWithCapabilities(st store.Store, manager *lifecycle.Manager, feishuWebho
 	s.mux.HandleFunc("POST /v1/agents/{id}/executions",s.submitExecution)
 	s.mux.HandleFunc("GET /v1/tasks/{id}",s.getTask)
 	s.mux.HandleFunc("POST /v1/tasks/{id}/cancel",s.cancelTask)
-	if feishuWebhook!=nil { s.mux.Handle("POST /webhooks/feishu",feishuWebhook) }
+	if feishuWebhook!=nil {
+		s.mux.Handle("POST /webhooks/feishu",feishuWebhook)
+		s.mux.Handle("POST /webhooks/feishu/{app}",feishuWebhook)
+	}
 	return s
 }
 

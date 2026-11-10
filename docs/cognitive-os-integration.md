@@ -29,4 +29,37 @@ The REST API documents `POST /v1/tasks` with a `prompt`, `GET /v1/tasks/{id}`, a
 
 Super Agent Bot Plantform implements the Go-side Runtime record, single-flight wake reservation, generation fencing, sleep admission checks and an injectable `lifecycle.Driver` interface.
 
-There is deliberately no production C11 driver yet. The pinned runtime includes tool and plugin execution paths; launching it as a Host service before capability restriction would violate the Super Agent Bot Plantform trust boundary. Runtime wake/sleep HTTP endpoints therefore return `503 runtime_driver_unavailable` until a reviewed driver is wired in.
+The optional Cognitive OS adapter runs one C11 process per API or Feishu message in a disposable
+Docker Worker. The Agent's private workspace persists across messages. Runtime
+state lives in a temporary filesystem for the duration of the task. The C11
+policy allows file reads, writes, edits, directory listings, globbing and text
+search. Docker disables networking. The worker relays model requests over
+stdio to the control plane, which uses the configured model endpoint and key.
+
+On Linux, first build the pinned Cognitive OS base image with
+[`Dockerfile.agent-capacity`](../deploy/Dockerfile.agent-capacity), using a
+`cognitive-os-agent` binary built from `COGNITIVE_OS_REF`. Then build the
+message Worker image:
+
+```bash
+build_dir=$(mktemp -d)
+CGO_ENABLED=0 go build -o "$build_dir/sabp-cognitive-worker" ./control/cmd/cognitive-worker
+docker build --build-arg COGNITIVE_BASE_IMAGE=light-agent/cognitive-capacity-recipe:6bdfc849 \
+  -f deploy/Dockerfile.cognitive-worker -t light-agent/cognitive-feishu:6bdfc849 "$build_dir"
+docker image inspect light-agent/cognitive-feishu:6bdfc849 --format '{{.Id}}'
+```
+
+Set `LIGHT_AGENT_COGNITIVE_IMAGE` to that local image ID and
+`LIGHT_AGENT_COGNITIVE_WORKSPACES` to an absolute private directory for Agent
+workspaces. Use the existing [Feishu and model settings](../README.md#connect-a-feishu-bot-and-model-on-linux).
+The control plane must be able to run Docker and create directories owned by
+the Worker UID. Restart it, then ask the bot to write a file and read it back
+in a separate message. API clients can also create an Agent with `POST /v1/agents`,
+submit a task with `POST /v1/agents/{id}/messages` using
+`{"request_id":"write-notes","content":"Create notes.txt in the workspace"}`,
+and poll `GET /v1/tasks/{id}` with the returned task ID. API tasks return their
+results through the task endpoint.
+
+Runtime wake/sleep HTTP endpoints still return `503 runtime_driver_unavailable`.
+The per-message adapter does not implement the production lifecycle
+driver above.

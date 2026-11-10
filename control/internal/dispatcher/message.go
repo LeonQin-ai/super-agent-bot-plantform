@@ -18,18 +18,42 @@ type MessageRunner interface {
 }
 
 type MessageReply func(context.Context, string, string, string) error
+type ScopedMessageReply func(context.Context, string, string, string, string) error
+type AgentRunner func(context.Context, string, string, string) (string, error)
 
 // ConfigureMessages must be called before the dispatcher starts.
 func (d *Dispatcher) ConfigureMessages(runner MessageRunner, reply MessageReply) {
 	d.messages, d.reply = runner, reply
 }
 
+func (d *Dispatcher) ConfigureScopedReplies(reply ScopedMessageReply) {
+	d.scopedReply = reply
+}
+
+// ConfigureAgentRuntime selects a Cognitive OS runtime for API and Feishu tasks.
+func (d *Dispatcher) ConfigureAgentRuntime(run AgentRunner) {
+	d.agentRuntime = run
+}
+
 func (d *Dispatcher) dispatchMessage(parent context.Context, task model.Task) bool {
 	var payload struct {
 		Source, Content string
 		MessageID       string `json:"message_id"`
+		FeishuRoute     string `json:"feishu_route"`
 	}
-	if json.Unmarshal([]byte(task.Payload), &payload) != nil || payload.Source != "feishu" {
+	if json.Unmarshal([]byte(task.Payload), &payload) != nil {
+		return false
+	}
+	switch payload.Source {
+	case "feishu":
+		if d.messages == nil && d.agentRuntime == nil {
+			return false
+		}
+	case "api":
+		if d.agentRuntime == nil {
+			return false
+		}
+	default:
 		return false
 	}
 	ctx, cancel := context.WithTimeout(parent, 4*time.Minute)
@@ -58,30 +82,58 @@ func (d *Dispatcher) dispatchMessage(parent context.Context, task model.Task) bo
 			return d.checksum(ctx, task, text)
 		}
 	}
-	answer, err := d.messages.Run(ctx, payload.Content, checksum)
+	var answer string
+	var err error
+	if d.agentRuntime != nil {
+		var agent model.Agent
+		agent, err = d.store.GetAgent(ctx, task.AgentID)
+		if err == nil {
+			answer, err = d.agentRuntime(ctx, task.ID, agent.WorkspaceID, payload.Content)
+			if err == nil {
+				d.logger.Info("Cognitive OS task completed", "task_id", task.ID, "source", payload.Source)
+			}
+		}
+	} else {
+		answer, err = d.messages.Run(ctx, payload.Content, checksum)
+	}
+	runContextErr := ctx.Err()
 	cancel()
 	<-watchExited
 	persist, done := context.WithTimeout(context.Background(), 5*time.Second)
 	defer done()
 	if err != nil {
-		d.logger.Warn("Feishu task failed", "task_id", task.ID, "error", err)
-		answer = "任务执行失败。请稍后再试。"
+		d.logger.Warn("Agent message task failed", "task_id", task.ID, "source", payload.Source, "error", err)
+		answer = "任务执行失败。任务编号 " + task.ID + "。"
+		var reported interface{ UserMessage() string }
+		if errors.As(err, &reported) && strings.TrimSpace(reported.UserMessage()) != "" {
+			answer = "任务未完成。\n" + reported.UserMessage() + "\n任务编号 " + task.ID + "。"
+		} else if errors.Is(runContextErr, context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
+			answer = "任务执行超时。任务编号 " + task.ID + "。"
+		}
 		err = d.store.FailTask(persist, task.ID, "message_execution_failed", answer)
 	} else {
 		err = d.store.CompleteTask(persist, task.ID, answer)
 	}
 	if err != nil {
 		if !errors.Is(err, store.ErrConflict) {
-			d.logger.Error("persist Feishu task result", "task_id", task.ID, "error", err)
+			d.logger.Error("persist Agent message result", "task_id", task.ID, "error", err)
 		}
 		return true
 	}
-	if d.reply == nil || payload.MessageID == "" || parent.Err() != nil {
+	if payload.Source != "feishu" || payload.MessageID == "" || parent.Err() != nil {
 		return true
 	}
 	replyCtx, replyDone := context.WithTimeout(parent, 22*time.Second)
 	defer replyDone()
-	if err := d.reply(replyCtx, payload.MessageID, task.ID, answer); err != nil {
+	switch {
+	case payload.FeishuRoute != "" && d.scopedReply != nil:
+		err = d.scopedReply(replyCtx, payload.FeishuRoute, payload.MessageID, task.ID, answer)
+	case payload.FeishuRoute == "" && d.reply != nil:
+		err = d.reply(replyCtx, payload.MessageID, task.ID, answer)
+	default:
+		return true
+	}
+	if err != nil {
 		d.logger.Warn("Feishu task reply failed", "task_id", task.ID, "error", err)
 	} else {
 		d.logger.Info("Feishu task reply delivered", "task_id", task.ID)

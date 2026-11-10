@@ -10,7 +10,15 @@ import (
 var (
 	ErrNotFound = errors.New("not found")
 	ErrConflict = errors.New("state conflict")
+	ErrTenantQueueFull = errors.New("tenant task queue is full")
 )
+
+type FeishuAppScope struct {
+	Tenant, AppID string
+	PendingLimit int
+}
+
+func (s FeishuAppScope) ReplyKey() string { return s.Tenant + "/" + s.AppID }
 
 type Store interface {
 	CreateAgent(context.Context, string, string) (model.Agent, error)
@@ -27,6 +35,7 @@ type Store interface {
 	ClearTaskWorker(context.Context, string) error
 	SetAgentState(context.Context, string, model.AgentState) error
 	IngestFeishuEvent(context.Context, string, string, string, string, ...string) (model.Task, bool, error)
+	IngestFeishuAppEvent(context.Context, FeishuAppScope, string, string, string, string, string) (model.Task, bool, error)
 	GetRuntime(context.Context, string) (model.Runtime, error)
 	BeginWake(context.Context, string) (model.Runtime, bool, error)
 	MarkRuntimeReady(context.Context, model.Runtime) error

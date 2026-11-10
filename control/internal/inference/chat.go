@@ -100,27 +100,51 @@ func (c *Client) complete(ctx context.Context, body map[string]any) (message, er
 	if err != nil {
 		return message{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(data))
+	response, err := c.Completion(ctx, data)
 	if err != nil {
 		return message{}, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.key)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return message{}, errors.New("model API request failed")
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return message{}, fmt.Errorf("model API returned HTTP %d", resp.StatusCode)
 	}
 	var result struct {
 		Choices []struct {
 			Message message `json:"message"`
 		} `json:"choices"`
 	}
-	if err = json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&result); err != nil || len(result.Choices) == 0 {
+	if err = json.Unmarshal(response, &result); err != nil || len(result.Choices) == 0 {
 		return message{}, errors.New("invalid model API response")
 	}
 	return result.Choices[0].Message, nil
+}
+
+// Completion sends a bounded request to the operator-configured model.
+func (c *Client) Completion(ctx context.Context, data []byte) (json.RawMessage, error) {
+	var request map[string]json.RawMessage
+	if err := json.Unmarshal(data, &request); err != nil || request == nil {
+		return nil, errors.New("invalid model API request")
+	}
+	request["model"], _ = json.Marshal(c.model)
+	request["thinking"] = json.RawMessage(`{"type":"disabled"}`)
+	delete(request, "stream")
+	data, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.key)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, errors.New("model API request failed")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("model API returned HTTP %d", resp.StatusCode)
+	}
+	result, err := io.ReadAll(io.LimitReader(resp.Body, (1<<20)+1))
+	if err != nil || len(result) > 1<<20 || !json.Valid(result) {
+		return nil, errors.New("invalid model API response")
+	}
+	return result, nil
 }

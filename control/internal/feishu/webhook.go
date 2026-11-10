@@ -24,8 +24,9 @@ type Config struct {
 }
 
 type Hook struct {
-	s store.Store
-	c Config
+	s     store.Store
+	c     Config
+	scope store.FeishuAppScope
 }
 
 func New(s store.Store, c Config) http.Handler { return &Hook{s: s, c: c} }
@@ -128,7 +129,17 @@ func (h *Hook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "text message required", http.StatusBadRequest)
 		return
 	}
-	if _, _, err := h.s.IngestFeishuEvent(r.Context(), v.Header.ID, openID, message.ChatID, strings.TrimSpace(content.Text), message.ID); err != nil {
+	var errIngest error
+	if h.scope.AppID == "" {
+		_, _, errIngest = h.s.IngestFeishuEvent(r.Context(), v.Header.ID, openID, message.ChatID, strings.TrimSpace(content.Text), message.ID)
+	} else {
+		_, _, errIngest = h.s.IngestFeishuAppEvent(r.Context(), h.scope, v.Header.ID, openID, message.ChatID, strings.TrimSpace(content.Text), message.ID)
+	}
+	if errors.Is(errIngest, store.ErrTenantQueueFull) {
+		http.Error(w, "tenant task queue is full", http.StatusTooManyRequests)
+		return
+	}
+	if errIngest != nil {
 		http.Error(w, "persist event failed", http.StatusInternalServerError)
 		return
 	}

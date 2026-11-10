@@ -11,9 +11,9 @@ Docker/runc Workers. Firecracker, gVisor and WASM have separate implementation a
 validation milestones.
 
 **Status:** Live Feishu replies and on-demand Docker execution have been verified
-on a Linux VM. Feishu direct messages use the configured model API. The production
-Cognitive OS lifecycle driver and the ordinary API chat endpoint's message driver
-are still pending.
+on a Linux VM. With the Cognitive OS Worker configured, both API messages and
+Feishu direct messages run through the C11 Agent. Runtime wake and sleep endpoints
+still require a separate lifecycle driver.
 
 ## What works today
 
@@ -103,6 +103,7 @@ require HTTPS. Plain HTTP is accepted only for loopback.
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/agents` | Create a persistent supervisor identity |
+| `POST /v1/agents/{id}/messages` | Queue a natural-language task for the configured Cognitive OS Agent |
 | `POST /v1/agents/{id}/executions` | Queue a trusted command; require `request_id` or `Idempotency-Key` |
 | `GET /v1/tasks/{id}` | Read durable task state and output |
 | `POST /v1/tasks/{id}/cancel` | Cancel queued/running work |
@@ -121,7 +122,16 @@ model over HTTPS. It creates a persistent Agent on the first authorized message
 from each Feishu Open ID and reuses it on subsequent messages. Each message
 creates an independent task. When the model requests the SHA-256 tool, the
 manager starts a network-disabled Docker Worker and removes it after execution.
-SHA-256 is the only sandbox tool currently exposed to the model.
+The direct model path exposes SHA-256. To give Feishu the Cognitive OS file and
+search tools in a persistent per-Agent workspace, configure the
+[Cognitive OS Worker](docs/cognitive-os-integration.md#current-status).
+This mode also supports `/news`, `/news tech`, `/news space`, and `/news health`.
+The control plane fetches public RSS entries from configured sources. The Agent
+produces a Chinese briefing and the reply includes links to the original items.
+Use `/jobs virtualization` to search the configured employers' public job
+boards and get links to their listings. See the
+[multi-application Feishu setup](docs/feishu-multi-application.md) to connect
+additional apps to one Platform.
 
 1. Enable the bot capability in a Feishu custom app, grant
    `im:message.p2p_msg:readonly` and `im:message:send_as_bot`, and select

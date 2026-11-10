@@ -13,11 +13,14 @@ import(
 	"time"
 
 	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/config"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/cognitive"
 	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/dispatcher"
 	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/execution"
 	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/feishu"
 	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/httpapi"
 	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/inference"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/jobs"
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/news"
 	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/store"
 )
 
@@ -31,7 +34,16 @@ func main(){
 	st,err:=store.Open(cfg.DBPath);if err!=nil{logger.Error("open state store","error",err);os.Exit(1)}
 	defer st.Close()
 	ctx,stop:=signal.NotifyContext(context.Background(),syscall.SIGINT,syscall.SIGTERM);defer stop()
-	webhook:=feishu.New(st,feishu.Config{Token:cfg.FeishuVerificationToken,EncryptKey:cfg.FeishuEncryptKey,Allowed:cfg.FeishuAllowedOpenIDs,AllowedFile:os.Getenv("FEISHU_ALLOWED_OPEN_ID_FILE")})
+	appRegistry := os.Getenv("FEISHU_APPLICATIONS_FILE")
+	if appRegistry != "" && cfg.APIAuthToken == "" {
+		logger.Error("multi-application Feishu requires the administrative API token")
+		os.Exit(2)
+	}
+	webhook, err := feishu.LoadApplications(st,feishu.Config{Token:cfg.FeishuVerificationToken,EncryptKey:cfg.FeishuEncryptKey,Allowed:cfg.FeishuAllowedOpenIDs,AllowedFile:os.Getenv("FEISHU_ALLOWED_OPEN_ID_FILE")},os.Getenv("FEISHU_APP_ID"),appRegistry)
+	if err != nil {
+		logger.Error("invalid Feishu application registry", "error", err)
+		os.Exit(2)
+	}
 	probeCtx,probeCancel:=context.WithTimeout(ctx,3*time.Second)
 	capabilities:=execution.Detect(probeCtx,execution.ProbeOptions{DockerSocket:cfg.DockerSocket,WASMRuntime:cfg.WASMRuntime})
 	var capabilityRegistry *execution.CapabilityRegistry
@@ -62,8 +74,10 @@ if cfg.SandboxManagerURL != "" {
 	api:=httpapi.NewWithCapabilities(st,nil,webhook,cfg.APIAuthToken,capabilities,scheduler)
 	if capabilityRegistry != nil { api=httpapi.NewWithCapabilitySource(st,nil,webhook,cfg.APIAuthToken,capabilityRegistry,scheduler) }
 	taskDispatcher:=dispatcher.NewWithExecution(st,logger,scheduler,capabilityRegistry)
+	taskDispatcher.ConfigureScopedReplies(webhook.Reply)
 	modelBase, modelName, modelKey := os.Getenv("LIGHT_AGENT_MODEL_BASE_URL"), os.Getenv("LIGHT_AGENT_MODEL"), os.Getenv("LIGHT_AGENT_MODEL_API_KEY")
-	if modelBase != "" || modelName != "" || modelKey != "" {
+	cognitiveImage := os.Getenv("LIGHT_AGENT_COGNITIVE_IMAGE")
+	if modelBase != "" || modelName != "" || modelKey != "" || cognitiveImage != "" {
 		modelClient, err := inference.New(modelBase, modelName, modelKey)
 		if err != nil {
 			logger.Error("invalid model configuration", "error", err)
@@ -75,6 +89,14 @@ if cfg.SandboxManagerURL != "" {
 			reply = replier.Reply
 		}
 		taskDispatcher.ConfigureMessages(modelClient, reply)
+		if cognitiveImage != "" {
+			runtime, err := cognitive.New(cognitiveImage, os.Getenv("LIGHT_AGENT_COGNITIVE_WORKSPACES"), modelClient)
+			if err != nil {
+				logger.Error("invalid Cognitive OS configuration", "error", err)
+				os.Exit(2)
+			}
+			taskDispatcher.ConfigureAgentRuntime(jobs.Wrap(news.Wrap(runtime.Run, runtime.RunBriefing)))
+		}
 	}
 	if err:=taskDispatcher.Recover(ctx);err!=nil { logger.Error("task reconciliation failed; refusing admission","error",err);os.Exit(1) }
 	dispatchDone:=make(chan struct{})

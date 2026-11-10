@@ -184,6 +184,38 @@ func TestRunningCancellationTerminatesWorker(t *testing.T) {
 	}
 }
 
+func TestAPIMessageUsesCognitiveAgentWorkspace(t *testing.T) {
+	st := openStore(t)
+	ctx := context.Background()
+	agent, err := st.CreateAgent(ctx, "tenant", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateTask(ctx, agent.ID, "message", `{"source":"api","content":"read notes","message_id":"om_unused"}`); err != nil {
+		t.Fatal(err)
+	}
+	task, err := st.ClaimNextTask(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := New(st, nil)
+	d.ConfigureMessages(nil, func(context.Context, string, string, string) error {
+		t.Error("API task attempted a Feishu reply")
+		return nil
+	})
+	d.ConfigureAgentRuntime(func(_ context.Context, id, workspace, prompt string) (string, error) {
+		if id != task.ID || workspace != agent.WorkspaceID || prompt != "read notes" {
+			t.Errorf("unexpected runtime request: %q %q %q", id, workspace, prompt)
+		}
+		return "notes contents", nil
+	})
+	d.dispatch(ctx, task)
+	got, err := st.GetTask(ctx, task.ID)
+	if err != nil || got.State != model.TaskCompleted || got.Result != "notes contents" {
+		t.Fatalf("unexpected task result: %+v %v", got, err)
+	}
+}
+
 func TestMessagesFailClosedAndRecoveryDoesNotReplay(t *testing.T) {
 	st := openStore(t)
 	ctx := context.Background()

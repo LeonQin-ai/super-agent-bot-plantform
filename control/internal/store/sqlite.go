@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -248,33 +249,56 @@ func (s *SQLite) SetAgentState(ctx context.Context, agentID string, state model.
 }
 
 func (s *SQLite) IngestFeishuEvent(ctx context.Context, eventID, openID, chatID, message string, messageID ...string) (model.Task, bool, error) {
+	var replyID string
+	if len(messageID) != 0 {
+		replyID = messageID[0]
+	}
+	return s.IngestFeishuAppEvent(ctx, FeishuAppScope{Tenant: "feishu:p2p"}, eventID, openID, chatID, message, replyID)
+}
+
+func (s *SQLite) IngestFeishuAppEvent(ctx context.Context, scope FeishuAppScope, eventID, openID, chatID, message, messageID string) (model.Task, bool, error) {
 	if eventID == "" || openID == "" || message == "" { return model.Task{}, false, errors.New("event_id, open_id and message are required") }
+	identity, inboxID := openID, eventID
+	if scope.AppID != "" {
+		identity = scopedFeishuKey(scope, openID)
+		inboxID = scopedFeishuKey(scope, eventID)
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil { return model.Task{}, false, err }
 	defer tx.Rollback()
 	var existingTaskID string
-	err = tx.QueryRowContext(ctx, "SELECT task_id FROM event_inbox WHERE event_id=?", eventID).Scan(&existingTaskID)
+	err = tx.QueryRowContext(ctx, "SELECT task_id FROM event_inbox WHERE event_id=?", inboxID).Scan(&existingTaskID)
 	if err == nil {
 		task, scanErr := scanTask(tx.QueryRowContext(ctx, `SELECT id,agent_id,request_id,state,payload,result,error_code,created_at,updated_at FROM tasks WHERE id=?`, existingTaskID))
 		return task, true, scanErr
 	}
 	if !errors.Is(err, sql.ErrNoRows) { return model.Task{}, false, err }
+	if scope.PendingLimit > 0 {
+		var pending int
+		err = tx.QueryRowContext(ctx, `SELECT count(*) FROM tasks t JOIN agents a ON a.id=t.agent_id
+WHERE a.tenant_id=? AND t.state IN ('QUEUED','RUNNING')`, scope.Tenant).Scan(&pending)
+		if err != nil { return model.Task{}, false, err }
+		if pending >= scope.PendingLimit { return model.Task{}, false, ErrTenantQueueFull }
+	}
 	now, agentID := timestamp(), ""
-	err = tx.QueryRowContext(ctx, "SELECT id FROM agents WHERE external_identity=?", openID).Scan(&agentID)
+	err = tx.QueryRowContext(ctx, "SELECT id FROM agents WHERE external_identity=?", identity).Scan(&agentID)
 	if errors.Is(err, sql.ErrNoRows) {
 		agentID = newID("agt")
 		_, err = tx.ExecContext(ctx, `INSERT INTO agents
 (id,tenant_id,role,state,memory_id,session_id,workspace_id,generation,created_at,updated_at,last_active_at,external_identity)
-VALUES(?,'feishu:p2p','supervisor','IDLE',?,?,?,0,?,?,?,?)`,
-			agentID,newID("mem"),newID("ses"),newID("wsp"),now,now,now,openID)
+VALUES(?,?,'supervisor','IDLE',?,?,?,0,?,?,?,?)`,
+			agentID,scope.Tenant,newID("mem"),newID("ses"),newID("wsp"),now,now,now,identity)
 		if err == nil {
 			_, err = tx.ExecContext(ctx, "INSERT INTO runtime_instances(agent_id,state,generation,created_at,updated_at) VALUES(?,'ABSENT',0,?,?)", agentID, now, now)
 		}
 	}
 	if err != nil { return model.Task{}, false, fmt.Errorf("resolve Feishu Agent: %w", err) }
 	fields := map[string]string{"source":"feishu","open_id":openID,"chat_id":chatID,"content":message}
-	if len(messageID) != 0 && messageID[0] != "" {
-		fields["message_id"] = messageID[0]
+	if messageID != "" {
+		fields["message_id"] = messageID
+	}
+	if scope.AppID != "" {
+		fields["feishu_route"] = scope.ReplyKey()
 	}
 	payload, err := json.Marshal(fields)
 	if err != nil { return model.Task{}, false, err }
@@ -282,12 +306,17 @@ VALUES(?,'feishu:p2p','supervisor','IDLE',?,?,?,0,?,?,?,?)`,
 	_, err = tx.ExecContext(ctx, `INSERT INTO tasks(id,agent_id,request_id,state,payload,created_at,updated_at)
 VALUES(?,?,?,'QUEUED',?,?,?)`, taskID,agentID,eventID,string(payload),now,now)
 	if err != nil { return model.Task{}, false, err }
-	_, err = tx.ExecContext(ctx, "INSERT INTO event_inbox(event_id,agent_id,task_id,source,received_at) VALUES(?,?,?,'feishu',?)", eventID,agentID,taskID,now)
+	_, err = tx.ExecContext(ctx, "INSERT INTO event_inbox(event_id,agent_id,task_id,source,received_at) VALUES(?,?,?,'feishu',?)", inboxID,agentID,taskID,now)
 	if err != nil { return model.Task{}, false, err }
 	task, err := scanTask(tx.QueryRowContext(ctx, `SELECT id,agent_id,request_id,state,payload,result,error_code,created_at,updated_at FROM tasks WHERE id=?`, taskID))
 	if err != nil { return model.Task{}, false, err }
 	if err = tx.Commit(); err != nil { return model.Task{}, false, err }
 	return task, false, nil
+}
+
+func scopedFeishuKey(scope FeishuAppScope, value string) string {
+	digest := sha256.Sum256([]byte(scope.Tenant + "\x00" + scope.AppID + "\x00" + value))
+	return "feishu:" + hex.EncodeToString(digest[:])
 }
 
 func (s *SQLite) GetRuntime(ctx context.Context, agentID string) (model.Runtime, error) {

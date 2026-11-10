@@ -10,8 +10,8 @@ Agent 身份、任务状态和记忆引用独立于执行进程保存，执行�
 Firecracker、gVisor 和 WASM 各有独立的实现与验证里程碑。
 
 **当前状态**　已在真实 Linux 虚拟机上验证飞书私聊回复和按需启动 Docker Worker。
-飞书私聊调用已配置的模型 API。生产级 Cognitive OS 生命周期驱动和普通 API
-聊天接口的消息驱动仍待接入。
+配置 Cognitive OS Worker 后，普通 API 消息和飞书私聊均可交给 C11 Agent 执行。
+唤醒和休眠接口仍需要单独的生命周期驱动。
 
 ## 已实现的能力
 
@@ -96,6 +96,7 @@ go run ./control/cmd/light-agentd
 | 接口 | 用途 |
 |---|---|
 | `POST /v1/agents` | 创建持久化 supervisor 身份 |
+| `POST /v1/agents/{id}/messages` | 将自然语言任务提交给已配置的 Cognitive OS Agent |
 | `POST /v1/agents/{id}/executions` | 提交受信结构化命令；必须提供 `request_id` 或 `Idempotency-Key` |
 | `GET /v1/tasks/{id}` | 查询持久任务状态和结果 |
 | `POST /v1/tasks/{id}/cancel` | 取消排队或运行中的任务 |
@@ -112,7 +113,14 @@ go run ./control/cmd/light-agentd
 飞书桥接进程。控制面通过 HTTPS 调用模型 API。白名单内的飞书用户首次私聊时会
 创建持久化 Agent，后续消息复用该 Agent，每条消息独立创建任务。模型调用 SHA-256
 工具时，Sandbox Manager 才会启动禁用网络的 Docker Worker，执行结束后清理容器。
-当前提供给模型的沙箱工具只有 SHA-256。
+直连模型模式提供 SHA-256 工具。需要在每个 Agent 的持久工作区中使用文件读写、
+目录浏览和内容搜索时，可配置 [Cognitive OS Worker](docs/cognitive-os-integration.md#current-status)。
+该模式也支持新闻简报。在飞书发送「查新闻」或「查新闻 科技」，也可用
+`/news`、`/news tech`、`/news space`、`/news health`。控制面从预设的公开
+RSS 源获取条目，Agent 整理中文摘要，回复附原文链接。
+问「你可以抓取今天的新闻吗」时，按北京时间筛选当天发布的条目。
+也可发送「搜索虚拟化岗位」或 `/jobs virtualization`，查询预设雇主的公开招聘板，
+回复包含职位、地点和招聘原文链接。多应用接入见[飞书应用配置](docs/feishu-multi-application.md)。
 
 1. 在飞书开放平台的企业自建应用中启用机器人，开通 `im:message.p2p_msg:readonly`
    和 `im:message:send_as_bot`，选择长连接接收事件，订阅 `im.message.receive_v1`
