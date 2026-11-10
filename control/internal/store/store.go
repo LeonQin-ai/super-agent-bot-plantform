@@ -25,6 +25,7 @@ type Store interface {
 	GetAgent(context.Context, string) (model.Agent, error)
 	CreateTask(context.Context, string, string, string) (model.Task, error)
 	GetTask(context.Context, string) (model.Task, error)
+	RecentMessageTurns(context.Context, model.Task) ([]model.MessageTurn, error)
 	CancelTask(context.Context, string) (model.Task, error)
 	ClaimNextTask(context.Context) (model.Task, error)
 	CompleteTask(context.Context, string, string) error

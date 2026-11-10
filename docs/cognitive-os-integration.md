@@ -30,8 +30,11 @@ The REST API documents `POST /v1/tasks` with a `prompt`, `GET /v1/tasks/{id}`, a
 Super Agent Bot Plantform implements the Go-side Runtime record, single-flight wake reservation, generation fencing, sleep admission checks and an injectable `lifecycle.Driver` interface.
 
 The optional Cognitive OS adapter runs one C11 process per API or Feishu message in a disposable
-Docker Worker. The Agent's private workspace persists across messages. Runtime
-state lives in a temporary filesystem for the duration of the task. The C11
+Docker Worker. The Agent's private workspace and the upstream light-agent
+memory directory persist across messages. Other runtime state lives in a
+temporary filesystem for the duration of the task. The control plane also
+supplies up to six recent completed exchanges for the same Agent from SQLite,
+subject to a prompt size limit. The C11
 policy allows file reads, writes, edits, directory listings, globbing and text
 search. Docker disables networking. The worker relays model requests over
 stdio to the control plane, which uses the configured model endpoint and key.

@@ -3,7 +3,7 @@
 [English](README.md) | **简体中文**
 
 一个将持久化 Agent 身份与可销毁执行运行时分离的项目，基于 Go、Rust 和
-C11 [Cognitive OS](https://github.com/LeonQin-ai/cognitive-os-agent) 构建。
+C11 [light-agent](https://github.com/LeonQin-ai/light-agent) 运行时构建。
 
 Agent 身份、任务状态和记忆引用独立于执行进程保存，执行后端由任务策略与已验证的主机能力选择。
 当前可用路径是在加固的 Docker/runc Worker 中运行经过批准的内部命令。
@@ -121,6 +121,8 @@ RSS 源获取条目，Agent 整理中文摘要，回复附原文链接。
 问「你可以抓取今天的新闻吗」时，按北京时间筛选当天发布的条目。
 也可发送「搜索虚拟化岗位」或 `/jobs virtualization`，查询预设雇主的公开招聘板，
 回复包含职位、地点和招聘原文链接。多应用接入见[飞书应用配置](docs/feishu-multi-application.md)。
+同一 Agent 会保留最近的对话上下文和 light-agent 原生记忆。搜索岗位后追问
+「有没有杭州地区的」会沿用上一次搜索的岗位关键词。
 
 1. 在飞书开放平台的企业自建应用中启用机器人，开通 `im:message.p2p_msg:readonly`
    和 `im:message:send_as_bot`，选择长连接接收事件，订阅 `im.message.receive_v1`

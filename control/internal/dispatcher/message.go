@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/conversation"
 	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/execution"
 	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/model"
 	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/store"
@@ -88,9 +89,13 @@ func (d *Dispatcher) dispatchMessage(parent context.Context, task model.Task) bo
 		var agent model.Agent
 		agent, err = d.store.GetAgent(ctx, task.AgentID)
 		if err == nil {
-			answer, err = d.agentRuntime(ctx, task.ID, agent.WorkspaceID, payload.Content)
+			var turns []model.MessageTurn
+			turns, err = d.store.RecentMessageTurns(ctx, task)
 			if err == nil {
-				d.logger.Info("Cognitive OS task completed", "task_id", task.ID, "source", payload.Source)
+				answer, err = d.agentRuntime(conversation.WithTurns(ctx, turns), task.ID, agent.WorkspaceID, payload.Content)
+				if err == nil {
+					d.logger.Info("Cognitive OS task completed", "task_id", task.ID, "source", payload.Source)
+				}
 			}
 		}
 	} else {

@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/conversation"
 )
 
 const MaxFrame = 2 << 20
@@ -25,12 +27,14 @@ func (e taskError) Error() string       { return e.reason }
 func (e taskError) UserMessage() string { return e.detail }
 
 type Frame struct {
-	Prompt   string          `json:"prompt,omitempty"`
-	Briefing bool            `json:"briefing,omitempty"`
-	Request  json.RawMessage `json:"request,omitempty"`
-	Response json.RawMessage `json:"response,omitempty"`
-	Answer   string          `json:"answer,omitempty"`
-	Error    string          `json:"error,omitempty"`
+	ArtifactRequested bool            `json:"-"`
+	Prompt            string          `json:"prompt,omitempty"`
+	Briefing          bool            `json:"briefing,omitempty"`
+	NativeMemory      bool            `json:"native_memory,omitempty"`
+	Request           json.RawMessage `json:"request,omitempty"`
+	Response          json.RawMessage `json:"response,omitempty"`
+	Answer            string          `json:"answer,omitempty"`
+	Error             string          `json:"error,omitempty"`
 }
 
 type Model interface {
@@ -57,11 +61,18 @@ func (r *Runner) Run(ctx context.Context, task, workspace, prompt string) (strin
 	if !workspaceID.MatchString(workspace) {
 		return "", errors.New("invalid Cognitive OS task")
 	}
-	dir, err := r.workspace(workspace)
+	dir, err := privateDirectory(r.workspaces, workspace)
 	if err != nil {
 		return "", err
 	}
-	return r.run(ctx, task, []string{"--mount", "type=bind,src=" + dir + ",dst=/workspace"}, Frame{Prompt: prompt})
+	memory, err := privateDirectory(filepath.Join(r.workspaces, ".native-memory"), workspace)
+	if err != nil {
+		return "", err
+	}
+	return r.run(ctx, task, []string{"--mount", "type=bind,src=" + dir + ",dst=/workspace",
+		"--mount", "type=bind,src=" + memory + ",dst=/agent-memory"}, Frame{
+		Prompt: conversation.Prompt(ctx, prompt, 16<<10), ArtifactRequested: artifactWork(prompt), NativeMemory: true,
+	})
 }
 
 func (r *Runner) RunBriefing(ctx context.Context, task, prompt string) (string, error) {
@@ -111,11 +122,11 @@ func (r *Runner) run(ctx context.Context, task string, workspaceOptions []string
 	return answer, nil
 }
 
-func (r *Runner) workspace(id string) (string, error) {
-	if err := os.MkdirAll(r.workspaces, 0o700); err != nil {
+func privateDirectory(base, id string) (string, error) {
+	if err := os.MkdirAll(base, 0o700); err != nil {
 		return "", err
 	}
-	dir := filepath.Join(r.workspaces, id)
+	dir := filepath.Join(base, id)
 	if err := os.Mkdir(dir, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
 		return "", err
 	}
@@ -137,7 +148,7 @@ func (r *Runner) exchange(ctx context.Context, in io.Writer, out io.Reader, inpu
 	scanner := bufio.NewScanner(out)
 	scanner.Buffer(make([]byte, 4096), MaxFrame)
 	observations := make(map[call]bool)
-	artifactRequested := artifactWork(input.Prompt)
+	artifactRequested := input.ArtifactRequested
 	wroteArtifact := false
 	for requests := 0; scanner.Scan(); {
 		var frame Frame

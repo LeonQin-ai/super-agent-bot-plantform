@@ -38,9 +38,10 @@ recorded retry is acknowledged without creating another task.
 ## Deployment and capacity milestones
 
 The current deployment has one SQLite owner and one task dispatcher. An Agent
-has a persistent identity and workspace. Each Cognitive OS task starts a
-disposable Worker, and its internal conversation state is task-scoped. The
-remaining issue work includes session checkpoint/restore, separate Runtime and
+has a persistent identity, workspace, and native light-agent memory directory.
+Each Cognitive OS task starts a disposable Worker and can recall recent
+completed exchanges from SQLite. The remaining issue work includes full
+session checkpoint/restore, separate Runtime and
 Worker quotas, durable reply retries, remote node leases and cross-Platform
 failover. Validate those paths with separate Platform hosts and at least one
 virtual and one physical execution node.

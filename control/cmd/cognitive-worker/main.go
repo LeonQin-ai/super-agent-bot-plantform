@@ -48,6 +48,11 @@ func run(encoder *json.Encoder) error {
 	if err != nil {
 		return failure("could not initialize runtime state")
 	}
+	if request.NativeMemory && !request.Briefing {
+		if err := os.Symlink("/agent-memory", filepath.Join(state, "memory")); err != nil {
+			return failure("could not attach Agent memory")
+		}
+	}
 	rules := policy
 	if request.Briefing {
 		rules = `[{"tool":"*","action":"deny"}]`

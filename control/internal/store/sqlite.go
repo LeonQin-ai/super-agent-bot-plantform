@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS tasks (
  UNIQUE(agent_id, request_id)
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_state_created ON tasks(state, created_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_agent_completed ON tasks(agent_id, created_at DESC, id DESC) WHERE state='COMPLETED';
 CREATE TABLE IF NOT EXISTS event_inbox (
  event_id TEXT PRIMARY KEY, agent_id TEXT NOT NULL REFERENCES agents(id),
  task_id TEXT NOT NULL REFERENCES tasks(id), source TEXT NOT NULL DEFAULT 'feishu',

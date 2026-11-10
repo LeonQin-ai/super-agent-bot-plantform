@@ -73,3 +73,8 @@ type Task struct {
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
+
+type MessageTurn struct {
+	User      string `json:"user"`
+	Assistant string `json:"assistant"`
+}

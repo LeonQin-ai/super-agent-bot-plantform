@@ -3,7 +3,7 @@
 **English** | [简体中文](README.zh-CN.md)
 
 A persistent Agent control plane with disposable, policy-selected execution runtimes.
-Built with Go, Rust and the C11 [Cognitive OS](https://github.com/LeonQin-ai/cognitive-os-agent) runtime.
+Built with Go, Rust and the C11 [light-agent](https://github.com/LeonQin-ai/light-agent) runtime.
 
 Agent identity, task state and memory references persist independently of execution
 processes. The current working path runs approved internal commands in hardened
@@ -132,6 +132,8 @@ Use `/jobs virtualization` to search the configured employers' public job
 boards and get links to their listings. See the
 [multi-application Feishu setup](docs/feishu-multi-application.md) to connect
 additional apps to one Platform.
+An Agent retains recent conversation context and its native light-agent memory
+across Workers. Location follow-ups reuse the preceding job query.
 
 1. Enable the bot capability in a Feishu custom app, grant
    `im:message.p2p_msg:readonly` and `im:message:send_as_bot`, and select

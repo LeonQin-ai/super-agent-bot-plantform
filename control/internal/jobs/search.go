@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/LeonQin-ai/super-agent-bot-plantform/control/internal/conversation"
 )
 
 type AgentRun = func(context.Context, string, string, string) (string, error)
@@ -21,6 +23,7 @@ type board struct{ name, slug string }
 
 var boards = []board{{"Canonical", "canonical"}, {"Cloudflare", "cloudflare"}, {"Datadog", "datadog"}}
 var jobQuestion = regexp.MustCompile(`^(?:你可以|可以|能不能|帮我|请你|请)?(?:搜索|查找|查询|找|搜|查)(?:一下|下)?\s*(.+?)(?:相关)?(?:的)?\s*(?:工作岗位|招聘岗位|岗位|职位|工作)(?:吗|么|吧)?$`)
+var locationQuestion = regexp.MustCompile(`(?i)^(?:有没有|有|只看|只要|改成|换成|看看)\s*(?:([\p{Han}A-Za-z][\p{Han}A-Za-z .-]{0,30}?)(?:地区|区域|市)|(杭州|北京|上海|深圳|广州|成都|南京|苏州|武汉|杭州远程|Hangzhou))的(?:吗|么|呢|吧)?$`)
 var virtualization = regexp.MustCompile(`(?i)virtuali[sz]ation|hypervisor|\bkvm\b|qemu|libvirt|vmware|openstack`)
 
 var client = &http.Client{
@@ -30,15 +33,42 @@ var client = &http.Client{
 
 func Wrap(next AgentRun) AgentRun {
 	return func(ctx context.Context, task, workspace, prompt string) (string, error) {
-		query, ok := queryFrom(prompt)
+		query, location, ok := resolveSearch(ctx, prompt)
 		if !ok {
 			return next(ctx, task, workspace, prompt)
 		}
 		if query == "" || utf8.RuneCountInString(query) > 80 {
 			return "请提供岗位关键词，例如「搜索虚拟化岗位」或「/jobs virtualization」。", nil
 		}
-		return search(ctx, query)
+		return search(ctx, query, location)
 	}
+}
+
+func resolveSearch(ctx context.Context, prompt string) (query, location string, matched bool) {
+	if query, ok := queryFrom(prompt); ok {
+		return query, "", true
+	}
+	location = followupLocation(prompt)
+	if location == "" {
+		return "", "", false
+	}
+	for _, turn := range conversation.Turns(ctx) {
+		if topic, ok := queryFrom(turn.User); ok && topic != "" {
+			return topic, location, true
+		}
+		if followupLocation(turn.User) == "" {
+			break
+		}
+	}
+	return "", "", false
+}
+
+func followupLocation(prompt string) string {
+	match := locationQuestion.FindStringSubmatch(strings.TrimRight(strings.TrimSpace(prompt), "？?！!。"))
+	if len(match) == 3 {
+		return strings.TrimSpace(match[1] + match[2])
+	}
+	return ""
 }
 
 func queryFrom(prompt string) (string, bool) {
@@ -69,7 +99,7 @@ type result struct {
 	err    error
 }
 
-func search(ctx context.Context, query string) (string, error) {
+func search(ctx context.Context, query, location string) (string, error) {
 	results := make(chan result, len(boards))
 	for _, source := range boards {
 		go func(source board) {
@@ -96,7 +126,7 @@ func search(ctx context.Context, query string) (string, error) {
 			if err != nil || link.Scheme != "https" || link.Hostname() == "" || link.User != nil || len(job.Link) > 512 {
 				continue
 			}
-			if rank := matchTitle(query, job.Title); rank != 0 {
+			if rank := matchTitle(query, job.Title); rank != 0 && matchesLocation(location, job.Location.Name) {
 				matches = append(matches, match{job, res.source.name, rank})
 			}
 		}
@@ -119,12 +149,20 @@ func search(ctx context.Context, query string) (string, error) {
 		return matches[i].Link < matches[j].Link
 	})
 	var answer strings.Builder
-	fmt.Fprintf(&answer, "「%s」岗位搜索\n已查阅雇主公开招聘板：%s。", query, strings.Join(checked, "、"))
+	fmt.Fprintf(&answer, "「%s」岗位搜索", query)
+	if location != "" {
+		fmt.Fprintf(&answer, " · %s", location)
+	}
+	fmt.Fprintf(&answer, "\n已查阅雇主公开招聘板：%s。", strings.Join(checked, "、"))
 	if len(unavailable) != 0 {
 		fmt.Fprintf(&answer, "\n暂未能读取：%s。", strings.Join(unavailable, "、"))
 	}
 	if len(matches) == 0 {
-		answer.WriteString("\n这些招聘板没有匹配的职位标题。可以试试英文职称或技术关键词。")
+		if location != "" {
+			fmt.Fprintf(&answer, "\n这些招聘板暂未找到地点明确标注为%s的匹配职位。", location)
+		} else {
+			answer.WriteString("\n这些招聘板没有匹配的职位标题。可以试试英文职称或技术关键词。")
+		}
 		return answer.String(), nil
 	}
 	seen := make(map[string]bool)
@@ -143,6 +181,14 @@ func search(ctx context.Context, query string) (string, error) {
 		}
 	}
 	return answer.String(), nil
+}
+
+func matchesLocation(requested, listed string) bool {
+	requested, listed = strings.ToLower(requested), strings.ToLower(listed)
+	if requested == "杭州" || requested == "hangzhou" {
+		return strings.Contains(listed, "杭州") || strings.Contains(listed, "hangzhou")
+	}
+	return requested == "" || strings.Contains(listed, requested)
 }
 
 func matchTitle(query, title string) int {
