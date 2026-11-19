@@ -148,6 +148,30 @@ RSS 源获取条目，Agent 整理中文摘要，回复附原文链接。
 「用沙箱计算 hello 的 SHA-256」。收到回复后，可通过控制面日志中的
 `Feishu sandbox checksum completed` 和 `Feishu task reply delivered` 核对执行和回执。
 
+### 用看板管理 Agent
+
+在本机启动控制面后，打开 [Agent 看板](http://127.0.0.1:8080/dashboard/)。
+如果 Linux 控制面监听服务器回环地址，通过 SSH 转发访问。下面以服务端端口
+18476 为例，请替换为实际主机和端口。
+
+```bash
+ssh -N -o ExitOnForwardFailure=yes -L 18476:127.0.0.1:18476 user@linux-host
+```
+
+保持 SSH 会话运行，打开[转发后的看板](http://127.0.0.1:18476/dashboard/)，
+在管理 Token 栏输入服务端配置的 `LIGHT_AGENT_API_TOKEN`。如果页面打不开，
+先检查 SSH 会话是否仍在运行。
+
+- **Agent 管理**。按租户创建 Agent，查看状态和最近的任务结果，也可给单个 Agent
+  发消息。首个任务会按需启动 Worker。
+- **批量会话**。为提交时已登记的每个 Agent 各入队一条消息，在各自的任务记录中查看结果。
+- **定时任务**。以浏览器本地时间设置首次运行时间，按分钟设置重复间隔。每次运行时，
+  给当时所有已登记的 Agent 入队。规则保存在 SQLite，重启后继续调度，停机期间错过的
+  多次运行会合并补跑一次。删除规则会停止后续运行，已入队任务仍可查看。
+
+发送消息和创建定时任务前，需要配置模型和
+[Cognitive OS Worker](docs/cognitive-os-integration.md#current-status)。
+
 ### 用 Compose 部署控制面
 
 ```bash

@@ -56,6 +56,10 @@ CREATE TABLE IF NOT EXISTS tasks (
  UNIQUE(agent_id, request_id)
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_state_created ON tasks(state, created_at);
+CREATE TABLE IF NOT EXISTS schedules (
+ id TEXT PRIMARY KEY, content TEXT NOT NULL, minutes INTEGER NOT NULL CHECK(minutes>0), next_run INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS broadcasts (request_id TEXT PRIMARY KEY, content TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_tasks_agent_completed ON tasks(agent_id, created_at DESC, id DESC) WHERE state='COMPLETED';
 CREATE TABLE IF NOT EXISTS event_inbox (
  event_id TEXT PRIMARY KEY, agent_id TEXT NOT NULL REFERENCES agents(id),
@@ -183,7 +187,7 @@ func (s *SQLite) GetTask(ctx context.Context, id string) (model.Task, error) {
 FROM tasks WHERE id=?`, id))
 }
 
-func scanTask(row *sql.Row) (model.Task, error) {
+func scanTask(row interface{ Scan(...any) error }) (model.Task, error) {
 	var t model.Task
 	var state string
 	err := row.Scan(&t.ID,&t.AgentID,&t.RequestID,&state,&t.Payload,&t.Result,&t.ErrorCode,&t.CreatedAt,&t.UpdatedAt)

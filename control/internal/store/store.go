@@ -23,6 +23,12 @@ func (s FeishuAppScope) ReplyKey() string { return s.Tenant + "/" + s.AppID }
 type Store interface {
 	CreateAgent(context.Context, string, string) (model.Agent, error)
 	GetAgent(context.Context, string) (model.Agent, error)
+	Agents(context.Context,string) ([]model.Agent,error)
+	Tasks(context.Context,string) ([]model.Task,error)
+	Broadcast(context.Context,string,string) (int64,error)
+	Schedules(context.Context) ([]Schedule,error)
+	AddSchedule(context.Context,Schedule) (Schedule,error)
+	RemoveSchedule(context.Context,string) error
 	CreateTask(context.Context, string, string, string) (model.Task, error)
 	GetTask(context.Context, string) (model.Task, error)
 	RecentMessageTurns(context.Context, model.Task) ([]model.MessageTurn, error)

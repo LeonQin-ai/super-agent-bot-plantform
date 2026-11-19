@@ -16,6 +16,7 @@ import (
 )
 
 type Server struct {
+	dashboardRuntime bool
 	store store.Store
 	manager *lifecycle.Manager
 	apiToken string
@@ -33,6 +34,7 @@ func NewWithCapabilities(st store.Store, manager *lifecycle.Manager, feishuWebho
 	s:=&Server{store:st,manager:manager,apiToken:apiToken,capabilities:capabilities,mux:http.NewServeMux()}
 	if len(schedulers)>0 { s.scheduler=schedulers[0] }
 	s.mux.HandleFunc("GET /healthz",s.health)
+	s.registerDashboard()
 	s.mux.HandleFunc("GET /v1/runtime/capabilities",s.getCapabilities)
 	s.mux.HandleFunc("POST /v1/execution/run",s.runExecution)
 	s.mux.HandleFunc("POST /v1/agents",s.createAgent)
@@ -64,6 +66,11 @@ func (s *Server) currentCapabilities() execution.Snapshot {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter,r *http.Request) {
+	if strings.HasPrefix(r.URL.Path,"/v1/") && r.Method != http.MethodGet && r.Method != http.MethodHead &&
+		r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+		writeError(w,403,"cross_site_request","use the control plane origin")
+		return
+	}
 	if strings.HasPrefix(r.URL.Path,"/v1/") && s.apiToken!="" {
 		authorization:=r.Header.Get("Authorization")
 		if !strings.HasPrefix(authorization,"Bearer ") {

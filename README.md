@@ -164,6 +164,33 @@ environment file. Once the bridge reports `Feishu WebSocket connected`, send
 that the bot replies and the control plane logs
 `Feishu sandbox checksum completed` and `Feishu task reply delivered`.
 
+### Manage Agents from the dashboard
+
+With the control plane running locally, open the [dashboard](http://127.0.0.1:8080/dashboard/).
+For a remote Linux deployment bound to loopback, keep an SSH tunnel open and
+forward the server's control-plane port. For example, if the server listens on
+port 18476:
+
+```bash
+ssh -N -o ExitOnForwardFailure=yes -L 18476:127.0.0.1:18476 user@linux-host
+```
+
+Open the [forwarded dashboard](http://127.0.0.1:18476/dashboard/) and enter the
+server's `LIGHT_AGENT_API_TOKEN` in the token field. If the page stops loading,
+check that the SSH session is still connected.
+
+- **Agents.** Create an Agent under a tenant, check its status and recent task
+  results, or send it a message. The first task starts its Worker on demand.
+- **Broadcasts.** Queue one copy of a message for each Agent registered at
+  submission time. Results appear in each Agent's task history.
+- **Schedules.** Set the first run in your browser's local time and a repeat
+  interval in minutes. Each run targets all Agents registered at that time.
+  SQLite stores the rules across restarts and coalesces missed intervals into
+  one run. Deleting a rule stops future runs and keeps already queued tasks.
+
+To send messages or create schedules, configure the model and
+[Cognitive OS Worker](docs/cognitive-os-integration.md#current-status).
+
 ### Deploy the control plane with Compose
 
 ```bash

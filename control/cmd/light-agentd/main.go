@@ -96,6 +96,21 @@ if cfg.SandboxManagerURL != "" {
 				os.Exit(2)
 			}
 			taskDispatcher.ConfigureAgentRuntime(jobs.Wrap(news.Wrap(runtime.Run, runtime.RunBriefing)))
+			api.EnableDashboardRuntime()
+			go func() {
+				ticker := time.NewTicker(time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case now := <-ticker.C:
+						if err := st.QueueDueSchedule(ctx, now); err != nil && ctx.Err() == nil {
+							logger.Error("queue scheduled messages", "error", err)
+						}
+					}
+				}
+			}()
 		}
 	}
 	if err:=taskDispatcher.Recover(ctx);err!=nil { logger.Error("task reconciliation failed; refusing admission","error",err);os.Exit(1) }
